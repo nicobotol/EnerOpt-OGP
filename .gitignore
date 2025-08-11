@@ -12,3 +12,5 @@ manual/figure/*
 manual/figure/*.pdf
 *.pdf_tex
 *.png
+
+!manual/figure/graphical_abstract_simplified.png
