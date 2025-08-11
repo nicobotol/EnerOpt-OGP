@@ -1,0 +1,332 @@
+\documentclass[a4paper,12pt]{article}
+
+\usepackage[english]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{caption}
+\usepackage{pgfgantt}
+\usepackage{siunitx}
+\usepackage{bm}
+\usepackage{multicol}
+\usepackage{multirow}
+\usepackage{svg}
+\usepackage{hyperref}
+\usepackage[a4paper, top=30mm, bottom=30mm, left=30mm, right=30mm]{geometry}
+\usepackage[backend=biber,style=numeric,sorting=none]{biblatex}
+\addbibresource{../../references/bibliography.bib}
+\usepackage{listings}
+\lstset{basicstyle=\ttfamily}
+\setlength{\parskip}{.5\baselineskip}
+
+\newcommand{\figref}[1]{Figure \ref{#1}}
+
+\title{Manual for the use of the optimization code}
+
+\author{Andreetta Niccolò \\ niccolo.andreetta@ntnu.no \\
+}
+\date{\today}
+% \date{May 27, 2025}
+
+\begin{document}
+\maketitle
+\vspace{1cm}\noindent
+{\center
+  Petronas-NTNU-IEL Collaboration within the SAFER Project \\ 
+  \vspace{0.5cm}
+  Energy Storage Sizing/Control for 100\% Renewable Supplied Isolated Grids \\
+  \vspace{0.5cm}
+  Coordinated Converter Control for Stability and Power Quality in Inertia-less Grids
+}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=\columnwidth]{figure/graphical_abstract.pdf}
+\end{figure}
+
+\newpage
+This manual and the related code is a work in progress, which is continuously improved by the authors. It is not a finished work and may therefore contain defects or ``bugs'' inherent to this type of development. For this reason the work is provided without warranties of any kind concerning the work, including without limitation merchantability, fitness for a particular purpose, absence of defects or errors, and accuracy.
+
+\newpage
+\tableofcontents
+
+%    ____                  _     _ _ _ _   _           
+%   / ___|__ _ _ __   __ _| |__ (_) (_) |_(_) ___  ___ 
+%  | |   / _` | '_ \ / _` | '_ \| | | | __| |/ _ \/ __|
+%  | |__| (_| | |_) | (_| | |_) | | | | |_| |  __/\__ \
+%   \____\__,_| .__/ \__,_|_.__/|_|_|_|\__|_|\___||___/
+%             |_|                                      
+
+\newpage
+\section{Code Capabilities}
+The focus of this manual is on the code capabilities and structure, so the reader can gain an understanding on how to use the code.   \\
+The code is developed requiring as input data series of the load and the environmental resources, the different type of assets (generators and storages) that can be installed, and their costs, and provides as output the optimal assets combination to support the load with the given specification. The code is able to perform parametric sweep of some user-defined parameters.\\
+From the technical perspective the code builds and solves an optimization problem expressed as a Mixed Integer Linear Programming (MILP).
+
+\section{Prerequisites}
+The following Matlab products are required:
+\begin{itemize}
+  \item Optimization toolbox
+  \item Statistics and Machine Learning Toolbox
+  \item Parallel Computing Toolbox
+  \item Global Optimization Toolbox
+\end{itemize}
+
+\subsection{Available assets}
+Management of the different devices: Battery Energy Storage System (BESS), Solar PV, Wind Turbine (WT), Diesel Generator (DG), Gas Turbine (GT), and potential extension to Hydrogen Fuel Cell.
+
+\subsection{Configurations}
+Different device configurations can be selected by the user before running the optimization (e.g. \texttt{WT+DG}, \texttt{REC-U}, \texttt{REC-U+DG}, \texttt{REC-C+DG24}).
+
+\subsection{Parameter Sweeps}
+It is possible to perform parameter sweep. Examples include risk-related variables, carbon tax, PV cost. When operating on parametric sweep it might time advantageous to parallelize hte execution of ht ecode.
+
+%   ____  _                   _                  
+%  / ___|| |_ _ __ _   _  ___| |_ _   _ _ __ ___ 
+%  \___ \| __| '__| | | |/ __| __| | | | '__/ _ \
+%   ___) | |_| |  | |_| | (__| |_| |_| | | |  __/
+%  |____/ \__|_|   \__,_|\___|\__|\__,_|_|  \___|
+                                               
+\newpage
+\section{Code Structure}
+\subsection{General Workflow}
+\begin{enumerate}
+  \item Data set import
+  \item Device definition
+  \item Optimization problem formulation
+  \item Post-processing
+  \item Results visualization
+\end{enumerate}
+
+\subsection{Initialization}
+Main file: \texttt{main\_decarbonization.m}  \\
+Select parallel or sequential execution: \texttt{enable\_parallel\_computing} (\figref{fig:main_decarbonization})
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=\columnwidth]{figure/main_decarbonization.png}
+  \caption{Main project file structure}
+  \label{fig:main_decarbonization}
+\end{figure}
+
+\subsection{Converters}
+Defined in \texttt{define\_converters\_corepower\_MW\_formulation} with all parameters \figref{fig:converters}.  
+Converters and storages are defined in classes \figref{fig:classes}.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.75\columnwidth]{figure/converters.png}
+  \caption{Converter definition}
+  \label{fig:converters}
+\end{figure}
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.4\columnwidth]{figure/classes.png}
+  \caption{Class definitions for converters and storage}
+  \label{fig:classes}
+\end{figure}
+
+\subsection{Dataset Import}
+\texttt{import\_datasets\_norway\_1yr} loads the datasets of load and resources.  
+Structure depends heavily on datasets in use, in the sense that the user has to tune the loading function according to the format of the available dataset \figref{fig:dataset_load}.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=\columnwidth]{figure/dataset_load.png}
+  \caption{Example dataset loading}
+  \label{fig:dataset_load}
+\end{figure}
+
+\subsection{Configuration Selection}
+\texttt{case\_sim\_vec} defines which devices are included in optimization. The user can specify which configuration to use among the listed ones \figref{fig:config_selection}. If the user wants to add more configurations he/she has to start doing it from here. 
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.5\columnwidth]{figure/config_selection.png}
+  \caption{Configuration selection}
+  \label{fig:config_selection}
+\end{figure}
+
+\subsection{Sweep Type Selection}
+Selection of sweep type. The sweep can be performed on the listed quantities:
+\begin{itemize}
+  \item \texttt{None}: No sweep
+  \item \texttt{beta}: Control parameter of the Conditional Value at Risk
+  \item \texttt{LPSP}: Lost of Power Supply Probability (percentage)
+  \item \texttt{PS}: Peak shaving (percentage)
+  \item \texttt{Carbon\_tax}: scaling factor for the nominal carbon tax
+  \item \texttt{PVCost}: scaling factor for the nominal PV cost
+\end{itemize}
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.5\columnwidth]{figure/sweep_sel.png}
+  \caption{Sweep type selection}
+\end{figure}
+
+\subsection{Main Loop}
+Loop over configurations and sweeps \figref{fig:main_for_loop_new}. Initially \texttt{do\_power} computes generated power given the load series and converter models (\figref{fig:do_power}), then \texttt{optimization\_setup} sets up the optimization parameters for the current case, and finally \texttt{CASE\_optimization} builds and solves the optimization problem. 
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=\columnwidth]{figure/main_for_loop_new.png}
+  \caption{Main loop}
+  \label{fig:main_for_loop_new}
+\end{figure}
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=\columnwidth]{figure/do_power_2.png}
+  \caption{Power computation from datasets}
+  \label{fig:do_power}
+\end{figure}
+
+%    ___        _   _           _          _   _             
+%   / _ \ _ __ | |_(_)_ __ ___ (_)______ _| |_(_) ___  _ __  
+%  | | | | '_ \| __| | '_ ` _ \| |_  / _` | __| |/ _ \| '_ \ 
+%  | |_| | |_) | |_| | | | | | | |/ / (_| | |_| | (_) | | | |
+%   \___/| .__/ \__|_|_| |_| |_|_/___\__,_|\__|_|\___/|_| |_|
+%        |_|                                                 
+
+\newpage
+\section{Optimization: CASE\_optimization}
+\subsection{General Notes}
+Optimization problem formulated as a \emph{problem-based} approach\footnote{\url{https://uk.mathworks.com/help/optim/problem-based-approach.html}}.  \\
+Different cases handled via \texttt{switch} statements.
+
+\subsection{Structure}
+\begin{enumerate}
+    \item Extract information from input
+    \item Define variables
+    \item Define costs
+    \item Compose objective function
+    \item Define constraints
+    \item Solve optimization
+    \item Post-process results
+\end{enumerate}
+
+\subsection{Information Extraction}
+Defines installed devices, load, and cost annualization factors \figref{fig:cost_ann}.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.8\columnwidth]{figure/cost_ann.png}
+  \caption{Cost annualization factors}
+  \label{fig:cost_ann}
+\end{figure}
+
+\subsection{Variable Definition}
+Variables for each device defined in its own function \figref{fig:variable_def}, as for example in the GT case in \figref{fig:variable_def_GT}:.
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.5\columnwidth]{figure/variable_def.png}
+  \caption{Variable definitions}
+  \label{fig:variable_def}
+\end{figure}
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=\columnwidth]{figure/variable_def_GT.png}
+  \caption{Gas Turbine variables}
+  \label{fig:variable_def_GT}
+\end{figure}
+
+\subsection{Cost Definition}
+Costs defined per asset in stage 1 and stage 2, in separate functions as shown in \figref{fig:costs}, and visible in the GT example \figref{fig:cost_GT}. Afterwards, they are composed as in \figref{fig:cost_composition}.
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.5\columnwidth]{figure/costs.png}
+  \caption{Cost definitions}
+  \label{fig:costs}
+\end{figure}
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=\columnwidth]{figure/cost_GT.png}
+  \caption{Gas Turbine cost function}
+  \label{fig:cost_GT}
+\end{figure}
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=\columnwidth]{figure/cost_composition.png}
+  \caption{Cost composition}
+  \label{fig:cost_composition}
+\end{figure}
+
+\subsection{Constraints}
+Constraints are imposed according to the utilized devices as in \figref{fig:constraints_general}. For example, for the GT they are as in \figref{fig:GT_constraints}.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.6\columnwidth]{figure/constraints_general.png}
+  \caption{General constraints}
+  \label{fig:constraints_general}. 
+\end{figure}
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\columnwidth]{figure/GT_constraints.png}
+    \caption{Gas Turbine constraints}
+    \label{fig:GT_constraints}
+\end{figure}
+
+\subsection{Solving}
+After having defined costs and constraints, the problem is solved as in \figref{fig:solve}.
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\columnwidth]{figure/solve.png}
+    \caption{Solving the optimization problem}
+    \label{fig:solve}
+\end{figure}
+
+\subsection{Post-Processing}
+Computes costs including already installed devices, $\text{CO}_\text{2}$ emissions, installed power as shown in \figref{fig:post_process}.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.65\columnwidth]{figure/post_process.png}
+    \caption{Post-processing results}
+    \label{fig:post_process}
+\end{figure}
+
+%   ____  _       _       
+%  |  _ \| | ___ | |_ ___ 
+%  | |_) | |/ _ \| __/ __|
+%  |  __/| | (_) | |_\__ \
+%  |_|   |_|\___/ \__|___/
+                        
+\newpage
+\section{Results and Plots}
+The results can be displayed using \texttt{plot\_decarbonization} (\figref{fig:plot}), for producing plots like the one in \figref{fig:CO2_fraction}, \figref{fig:cost_F}, and \figref{fig:cost_fraction}.
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\columnwidth]{figure/plot.png}
+    \caption{Example plot layout}
+    \label{fig:plot}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.55\columnwidth]{figure/vectorial/CO2_fraction_2025_03_05_365_varPS.pdf}
+    \caption{$CO_2$ fraction}
+    \label{fig:CO2_fraction}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.55\columnwidth]{figure/vectorial/cost_F_2025_03_05_365_varPS.pdf}
+    \caption{Total cost} 
+    \label{fig:cost_F} 
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.55\columnwidth]{figure/vectorial/cost_fraction_2025_03_05_365_varPS.pdf}
+    \caption{Cost fraction breakdown}
+    \label{fig:cost_fraction}
+\end{figure}
+
+
+\printbibliography
+
+\end{document}
