@@ -64,7 +64,7 @@ REC.DG.n_NREC   = n_DG;
 % DG+REC365    & WT+PV+WEC (cstr.) + BESS + DIESEL w/o scenario
 
 case_sim_vec = {'1GT+WT+DG', 'WT+DG', 'REC-U', 'REC-U+DG', 'REC-C+DG24'};
-% case_sim_vec = {'REC-U'};
+case_sim_vec = {'REC-U'};
 num_sim = length(case_sim_vec);
 
 %   ____                                    _   
@@ -81,7 +81,7 @@ num_sim = length(case_sim_vec);
 % PS   -> Change the power of the PS
 % Carbon_tax -> Change the carbon tax
 % DGpower -> Change the rated power of the DG
-sweep_type  = 'None';
+sweep_type  = 'beta';
 alpha_vec   = 0.8;  % [0.1, 0.5, 0.9];
 num_alpha   = size(alpha_vec, 2);
 switch sweep_type
@@ -120,7 +120,6 @@ CO2_emitted                           = cell(num_alpha, num_sweep, num_sim);
 load_scenarios.iniVec = LoadA.iniVec;
 
 parfor b = 1:num_sweep
-    converged_a = false(num_alpha,1);
   for a = 1:num_alpha
 
     res_scens{a,b}{1}  = wind.iniVec;
@@ -141,7 +140,7 @@ parfor b = 1:num_sweep
       [REC_el, load_scenarios_el, opt_parameters_el, scenario_tmp] = optimization_setup('None', alpha_vec, sweep_type, sweep_vec, a, b, REC_tmp{a,b}, load_scens{a,b}, scenario_mat(a, b), opt_parameters_vec(i), 0, case_sim);
       
       % Run optimization
-      [values_solution{a,b,i}, values_vector{a,b,i}, values_minvalue{a,b,i}, CO2_emitted{a,b,i}] = CASE_optimization(prob_scens{a,b}, REC_el, ESS, DL, load_scenarios_el, opt_parameters_el, scenario_tmp(a,b), case_sim);
+      [values_solution{a,b,i}, values_vector{a,b,i}, values_minvalue{a,b,i}, CO2_emitted{a,b,i}] = CASE_optimization(prob_scens{a,b}, REC_el, ESS, DL, load_scenarios_el, opt_parameters_el, scenario_tmp, case_sim);
 
       % Track time and convergence
       time_sim{a,b,i} = toc;

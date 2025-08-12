@@ -28,7 +28,7 @@ This manual and the related code is a work in progress, which is continuously im
 - [Configurations](#configurations)
 - [Parameter Sweeps](#parameter-sweeps)
 - [Code Structure](#code-structure)
-- [Optimization: CASE_optimization](#optimization-case_optimization)
+- [Optimization: CASE_optimization function](#optimization-case_optimization)
 - [Results and Plots](#results-and-plots)
 
 ---
@@ -124,7 +124,7 @@ Loop over configurations and sweeps (see Figure 6). Initially `do_power` compute
 
 ---
 
-# Optimization: CASE_optimization
+# Optimization: `CASE_optimization` function
 
 ## General Notes
 
