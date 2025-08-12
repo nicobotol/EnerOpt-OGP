@@ -2,8 +2,6 @@
 title: "Manual for the use of the optimization code"
 author: "Andreetta Niccolò\nniccolo.andreetta@ntnu.no"
 date: 2025-08-11
-geometry: margin=3cm
-fontsize: 12pt
 ---
 
 <center>
