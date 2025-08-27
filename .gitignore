@@ -14,3 +14,20 @@ manual/figure/*.pdf
 *.png
 
 !manual/figure/graphical_abstract_simplified.png
+!manual/figure/main_decarbonization.png
+!manual/figure/converters.png
+!manual/figure/classes.png
+!manual/figure/dataset_load.png
+!manual/figure/config_selection.png
+!manual/figure/sweep_sel.png
+!manual/figure/main_for_loop_new.png
+!manual/figure/do_power.png
+!manual/figure/variable_def.png
+!manual/figure/variable_def_GT.png
+!manual/figure/costs.png
+!manual/figure/cost_GT.png
+!manual/figure/cost_composition.png
+!manual/figure/constraints_general.png
+!manual/figure/GT_constraints.png
+!manual/figure/solve.png
+!manual/figure/post_process.png
