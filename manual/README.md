@@ -1,16 +1,11 @@
----
-title: "Manual for the use of the optimization code"
-author: "Andreetta Niccolò\nniccolo.andreetta@ntnu.no"
-date: 2025-08-11
----
 
+# Manual for the use of the optimization code
 <center>
-Petronas-NTNU-IEL Collaboration within the SAFER Project  
-<br>  
-Energy Storage Sizing/Control for 100% Renewable Supplied Isolated Grids  
-<br>  
-Coordinated Converter Control for Stability and Power Quality in Inertia-less Grids
-</center>
+Andreetta Niccolò niccolo.andreetta@ntnu.no
+<center>
+
+
+
 
 ![Graphical Abstract](figure/graphical_abstract_simplified.png)
 
