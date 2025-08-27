@@ -72,29 +72,29 @@ It is possible to perform parameter sweep. Examples include risk-related variabl
 Main file: `main_decarbonization.m`  
 Select parallel or sequential execution: `enable_parallel_computing` (see Figure 1)
 
-![Main project file structure](figure/main_decarbonization.png){#fig:main_decarbonization width=100%}
+![Main project file structure](figure/main_decarbonization.png)
 
 ## Converters
 
 Defined in `define_converters_corepower_MW_formulation` with all parameters (see Figure 2).  
 Converters and storages are defined in classes (see Figure 3).
 
-![Converter definition](figure/converters.png){#fig:converters width=75%}
+![Converter definition](figure/converters.png) 
 
-![Class definitions for converters and storage](figure/classes.png){#fig:classes width=40%}
+![Class definitions for converters and storage](figure/classes.png) 
 
 ## Dataset Import
 
 `import_datasets_norway_1yr` loads the datasets of load and resources.  
 Structure depends heavily on datasets in use, in the sense that the user has to tune the loading function according to the format of the available dataset (see Figure 4).
 
-![Example dataset loading](figure/dataset_load.png){#fig:dataset_load width=100%}
+![Example dataset loading](figure/dataset_load.png)
 
 ## Configuration Selection
 
 `case_sim_vec` defines which devices are included in optimization. The user can specify which configuration to use among the listed ones (see Figure 5). If the user wants to add more configurations, he/she has to start doing it from here.
 
-![Configuration selection](figure/config_selection.png){#fig:config_selection width=50%}
+![Configuration selection](figure/config_selection.png) 
 
 ## Sweep Type Selection
 
@@ -107,15 +107,15 @@ Selection of sweep type. The sweep can be performed on the listed quantities:
 - `Carbon_tax`: scaling factor for the nominal carbon tax  
 - `PVCost`: scaling factor for the nominal PV cost  
 
-![Sweep type selection](figure/sweep_sel.png){width=50%}
+![Sweep type selection](figure/sweep_sel.png) 
 
 ## Main Loop
 
 Loop over configurations and sweeps (see Figure 6). Initially `do_power` computes generated power given the load series and converter models (Figure 7), then `optimization_setup` sets up the optimization parameters for the current case, and finally `CASE_optimization` builds and solves the optimization problem.
 
-![Main loop](figure/main_for_loop_new.png){#fig:main_for_loop_new width=100%}
+![Main loop](figure/main_for_loop_new.png) 
 
-![Power computation from datasets](figure/do_power_2.png){#fig:do_power width=100%}
+![Power computation from datasets](figure/do_power_2.png)
 
 ---
 
@@ -142,45 +142,45 @@ Different cases handled via `switch` statements.
 
 Defines installed devices, load, and cost annualization factors (see Figure 8).
 
-![Cost annualization factors](figure/cost_ann.png){#fig:cost_ann width=80%}
+![Cost annualization factors](figure/cost_ann.png) 
 
 ## Variable Definition
 
 Variables for each device defined in its own function (Figure 9), as for example in the GT case in Figure 10:
 
-![Variable definitions](figure/variable_def.png){#fig:variable_def width=50%}
+![Variable definitions](figure/variable_def.png) 
 
-![Gas Turbine variables](figure/variable_def_GT.png){#fig:variable_def_GT width=100%}
+![Gas Turbine variables](figure/variable_def_GT.png) 
 
 ## Cost Definition
 
 Costs defined per asset in stage 1 and stage 2, in separate functions as shown in Figure 11, and visible in the GT example Figure 12. Afterwards, they are composed as in Figure 13.
 
-![Cost definitions](figure/costs.png){#fig:costs width=50%}
+![Cost definitions](figure/costs.png)
 
-![Gas Turbine cost function](figure/cost_GT.png){#fig:cost_GT width=100%}
+![Gas Turbine cost function](figure/cost_GT.png)
 
-![Cost composition](figure/cost_composition.png){#fig:cost_composition width=100%}
+![Cost composition](figure/cost_composition.png)
 
 ## Constraints
 
 Constraints are imposed according to the utilized devices as in Figure 14. For example, for the GT they are as in Figure 15.
 
-![General constraints](figure/constraints_general.png){#fig:constraints_general width=60%}
+![General constraints](figure/constraints_general.png)
 
-![Gas Turbine constraints](figure/GT_constraints.png){#fig:GT_constraints width=100%}
+![Gas Turbine constraints](figure/GT_constraints.png)
 
 ## Solving
 
 After having defined costs and constraints, the problem is solved as in Figure 16.
 
-![Solving the optimization problem](figure/solve.png){#fig:solve width=100%}
+![Solving the optimization problem](figure/solve.png)
 
 ## Post-Processing
 
 Computes costs including already installed devices, $\mathrm{CO}_2$ emissions, installed power as shown in Figure 17.
 
-![Post-processing results](figure/post_process.png){#fig:post_process width=65%}
+![Post-processing results](figure/post_process.png)
 
 ---
 
