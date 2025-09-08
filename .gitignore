@@ -12,6 +12,7 @@ manual/figure/*
 manual/figure/*.pdf
 *.pdf_tex
 *.png
+src/pathdef.m
 
 !manual/figure/graphical_abstract_simplified.png
 !manual/figure/main_decarbonization.png
