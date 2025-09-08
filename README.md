@@ -21,3 +21,6 @@ A early-stage user's manual is available in `manual\manual.pdf`
 
 ## Contact information
 Please report any bug or suggestions to: niccolo.andreetta@ntnu.no
+
+### Cite the work using the DOI
+[![DOI](https://zenodo.org/badge/1036283281.svg)](https://doi.org/10.5281/zenodo.17081291)
