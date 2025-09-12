@@ -22,5 +22,9 @@ A early-stage user's manual is available in `manual\manual.pdf`
 ## Contact information
 Please report any bug or suggestions to: niccolo.andreetta@ntnu.no
 
-### Cite the work using the DOI
+## Citations
+Cite this work as:\
 [![DOI](https://zenodo.org/badge/1036283281.svg)](https://doi.org/10.5281/zenodo.17081291)
+
+## Credits
+`DataX.m` was originally developed by [spixap/BESS-SIZING](https://github.com/spixap/BESS-SIZING) - [MIT](https://github.com/spixap/BESS-SIZING/blob/main/LICENSE)
