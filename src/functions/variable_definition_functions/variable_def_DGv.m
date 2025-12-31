@@ -1,5 +1,6 @@
 % Virtual power to be added to fix the power balance
 P_DGv = optimvar('P_DGv', [T, W], 'lowerBound', [0], 'UpperBound', P_DGv_max, 'Type', 'continuous');
+u_Pv = optimvar('u_Pv', [T, W], 'lowerBound', [0], 'UpperBound', 1, 'Type', 'integer');
 
 delta_P_DGv_max = optimvar('delta_P_DGv_max', [1, W], 'Type', 'integer', 'LowerBound', 0, 'UpperBound', 1); % variable equal to 1 if the the condition for allowing the use of the virtual power is satisfied
 P_DGv_max_inst = optimvar('P_DGv_max_inst', 1, 'Type', 'continuous', 'LowerBound', 0, 'UpperBound', Pload_obj.P_shaved_overpower*Pload_obj.P_rated);

@@ -10,7 +10,7 @@ enable_parallel_computing = 1; % 1 for parallel computing, 0 for sequential comp
 
 if enable_parallel_computing == 1 && isempty(gcp('nocreate'))
   num_core = feature('numcores');
-  parpool('Processes', 4);
+  parpool('Processes', num_core);
 end
 
 %    ____                          _                
@@ -64,7 +64,7 @@ REC.DG.n_NREC   = n_DG;
 % DG+REC365    & WT+PV+WEC (cstr.) + BESS + DIESEL w/o scenario
 
 case_sim_vec = {'1GT+WT+DG', 'WT+DG', 'REC-U', 'REC-U+DG', 'REC-C+DG24'};
-case_sim_vec = {'REC-U'};
+case_sim_vec = {'1GT+WT+DG'};
 num_sim = length(case_sim_vec);
 
 %   ____                                    _   
@@ -81,7 +81,9 @@ num_sim = length(case_sim_vec);
 % PS   -> Change the power of the PS
 % Carbon_tax -> Change the carbon tax
 % DGpower -> Change the rated power of the DG
-sweep_type  = 'beta';
+% PVCost -> Change the cost of the PV
+% WECCost -> Change the cost of the WEC
+sweep_type  = 'Carbon_tax';
 alpha_vec   = 0.8;  % [0.1, 0.5, 0.9];
 num_alpha   = size(alpha_vec, 2);
 switch sweep_type
@@ -97,6 +99,12 @@ switch sweep_type
     sweep_vec = [1,10,100,1000];
   case 'PVCost'
     sweep_vec = [1,0.7,0.5];
+    CAPEX_ref = PV_CAPEX_ref;
+    OPEX_ref  = PV_OPEX_ref;
+  case 'WECCost'
+    sweep_vec = [1,0.8,0.6,0.4];
+    CAPEX_ref = WEC_CAPEX_ref;
+    OPEX_ref  = WEC_OPEX_ref;
   otherwise
     error('Unknown sweep type')
 end
@@ -119,28 +127,27 @@ values_minvalue                       = cell(num_alpha, num_sweep, num_sim);
 CO2_emitted                           = cell(num_alpha, num_sweep, num_sim);
 load_scenarios.iniVec = LoadA.iniVec;
 
-parfor b = 1:num_sweep
-  for a = 1:num_alpha
+for i=1:num_sim
+  for b = 1:num_sweep
+    for a = 1:num_alpha
 
-    res_scens{a,b}{1}  = wind.iniVec;
-    res_scens{a,b}{2}  = irradiance.iniVec;
-    res_scens{a,b}{3}  = reshape(met_data_swh, [], 1);
-    res_scens{a,b}{4}  = reshape(met_data_mwp, [], 1);
+      res_scens{a,b,i}{1} = wind.iniVec;
+      res_scens{a,b,i}{2} = irradiance.iniVec;
+      res_scens{a,b,i}{3} = reshape(met_data_swh, [], 1);
+      res_scens{a,b,i}{4} = reshape(met_data_mwp, [], 1);
+      load_scens{a,b,i}   = load_scenarios;
+      prob_scens{a,b,i}   = 1/size(load_scenarios.iniVec, 2)*ones(size(load_scenarios.iniVec, 2), 1);
+      
+      [REC_tmp{a,b,i}]    = do_power(REC_obj(a,b,i), res_scens{a,b,i});
     
-    prob_scens{a,b}    = 1/size(load_scenarios.iniVec, 2)*ones(size(load_scenarios.iniVec, 2), 1);
-    
-    [REC_tmp{a,b}] = do_power(REC_obj(a,b), res_scens{a,b});
-    
-    for i=1:num_sim
       tic;
       case_sim = case_sim_vec{i};
-      load_scens{a,b}    = load_scenarios;
       
       % Optimization setup
-      [REC_el, load_scenarios_el, opt_parameters_el, scenario_tmp] = optimization_setup('None', alpha_vec, sweep_type, sweep_vec, a, b, REC_tmp{a,b}, load_scens{a,b}, scenario_mat(a, b), opt_parameters_vec(i), 0, case_sim);
+      [REC_el, load_scenarios_el, opt_parameters_el] = optimization_setup('alpha', alpha_vec, sweep_type, sweep_vec, a, b, REC_tmp{a,b,i}, base_CO2_tax, CAPEX_ref, OPEX_ref, load_scens{a,b,i}, opt_parameters_vec(i), BESS_NL_model, case_sim);
       
       % Run optimization
-      [values_solution{a,b,i}, values_vector{a,b,i}, values_minvalue{a,b,i}, CO2_emitted{a,b,i}] = CASE_optimization(prob_scens{a,b}, REC_el, ESS, DL, load_scenarios_el, opt_parameters_el, scenario_tmp, case_sim);
+      [values_solution{a,b,i}, values_vector{a,b,i}, values_minvalue{a,b,i}, CO2_emitted{a,b,i}] = CASE_optimization(prob_scens{a,b,i}, REC_el, ESS, DL, load_scenarios_el, opt_parameters_el, case_sim, scenario_mat(a,b));
 
       % Track time and convergence
       time_sim{a,b,i} = toc;

@@ -1,4 +1,4 @@
-function [values_reshaped, values] = reshape_data(values, Pload, Pres_vec, BAT)
+function [values_reshaped, values] = reshape_data(values, Pload, Pres_vec, BAT, HSS)
   
   values_reshaped.Pload   = reshape(Pload, [], 1);
   values.Eload  = trapz(values_reshaped.Pload); % Energy required by the load [Wh]
@@ -49,6 +49,17 @@ function [values_reshaped, values] = reshape_data(values, Pload, Pres_vec, BAT)
   else
     values.x_ESS_IV = 0;
     values.x_ESS_NIV = 0;
+  end
+
+  if isfield(values, 'Pel')
+    values_reshaped.Pel = reshape(values.Pel, [], 1);
+    values_reshaped.Pfc = reshape(values.Pfc, [], 1);
+    values.HSS_el_size = values.x_HSS_el*HSS.C_unitaryP_el;
+    values.HSS_fc_size = values.x_HSS_fc*HSS.C_unitaryP_fc;
+    values.HSS_st_size = values.x_HSS_IV*HSS.C_storage_u;
+  else
+    values_reshaped.Pel = 0;
+    values_reshaped.Pfc = 0;
   end
 
   %   ____  _____ ____ 

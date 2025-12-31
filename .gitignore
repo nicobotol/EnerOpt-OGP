@@ -8,6 +8,7 @@
 *.run.xml
 *.gz
 *.toc
+*.asv
 manual/figure/*
 manual/figure/*.pdf
 *.pdf_tex
@@ -34,3 +35,4 @@ src/pathdef.m
 !manual/figure/GT_constraints.png
 !manual/figure/solve.png
 !manual/figure/post_process.png
+src/functions/CASE_optimization_new.m

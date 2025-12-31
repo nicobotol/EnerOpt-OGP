@@ -1,22 +1,22 @@
-function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_optimization(LscensProbVec_N, REC, ESS, DL, Pload_obj, opt_parameters, scenario, case_constraint)
+function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_optimization(LscensProbVec_N, REC, ESS, DL, Pload_obj, opt_parameters, case_constraint, scenario)
   % This function solves the optimization assuming that the data of load and renewable energy sources are given in objectives form
   
   % Probability related variables
   cvar_alpha = opt_parameters.alpha;
   cvar_beta = opt_parameters.beta;
   rel_gap_tol = opt_parameters.rel_gap_tol;
-  abs_gap_tol = opt_parameters.abs_gap_tol;
-
+  max_time = opt_parameters.max_time;
   % Choice of the BESS model
   BESS_NL_model = opt_parameters.BESS_NL_model;
   
   % Extract the physical parameters from device structure
-  PV        = []; % Photovoltaic panel
-  WT        = []; % Wind turbine
-  WEC       = []; % Wind turbine
-  BAT       = []; % Battery
-  Pload     = []; % Load data
-  DG        = []; % Diesel generator
+  PV    = []; % Photovoltaic panel
+  WT    = []; % Wind turbine
+  WEC   = []; % Wind turbine
+  BAT   = []; % Battery
+  HSS   = []; % Hydrogen storage
+  Pload = []; % Load data
+  DG    = []; % Diesel generator
   P_DGv_max = Pload_obj.P_shaved_overpower*Pload_obj.P_rated; % Max virtual power Pv
   DGv_obj   = REC.DGv.DGv_obj; %
   
@@ -39,6 +39,7 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
       REC.GT.n_NREC = 1;
       WT      = REC.WT;           % Wind turbine
       BAT     = ESS.BAT;          % Battery
+      HSS     = ESS.HSS;          % Hydrogen storage system
       Pload   = Pload_obj.iniVec; % Load data
     
     case '2GT+WT+DG' % 2 GT + WT + BESS
@@ -46,6 +47,7 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
       REC.GT.n_NREC    = 2;
       WT      = REC.WT;           % Wind turbine
       BAT     = ESS.BAT;          % Battery
+      HSS     = ESS.HSS;          % Hydrogen storage system
       Pload   = Pload_obj.iniVec; % Load data
 
     case '1GT+REC+DG' % 1 GT + WT + PV + WEC + BESS
@@ -55,6 +57,7 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
       PV      = REC.PV;           % PV
       WEC     = REC.WEC;          % WEC
       BAT     = ESS.BAT;          % Battery
+      HSS     = ESS.HSS;          % Hydrogen storage system
       Pload   = Pload_obj.iniVec; % Load data
     
     case '2GT+REC+DG' % 2 GT + WT + PV + WEC + BESS
@@ -64,11 +67,13 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
       PV      = REC.PV;           % PV
       WEC     = REC.WEC;          % WEC
       BAT     = ESS.BAT;          % Battery
+      HSS     = ESS.HSS;          % Hydrogen storage system
       Pload   = Pload_obj.iniVec; % Load data
 
     case 'WT+DG' % only WT + BESS
       WT    = REC.WT;           % Wind turbine
       BAT   = ESS.BAT;          % Battery
+      HSS   = ESS.HSS;          % Hydrogen storage system
       Pload = Pload_obj.iniVec; % Load data
 
     case {'REC-U', 'REC-U+DG', 'REC-C+DG24'} % REC + BESS
@@ -77,32 +82,14 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
       WEC   = REC.WEC;          % WEC turbine
       BAT   = ESS.BAT;          % Battery
       Pload = Pload_obj.iniVec; % Load data
+      HSS   = ESS.HSS;          % Hydrogen storage system
 
     case {'REC-C+DG365'}
       PV    = REC.PV;           % Photovoltaic panel
       WT    = REC.WT;           % Wind turbine
       WEC   = REC.WEC;          % WEC turbine
       BAT   = ESS.BAT;          % Battery
-      Pload = Pload_obj.iniVec; % Load data
-
-      % Reshape the data such that they are in the form of the REC
-      Pload = reshape(Pload, [], 1);
-      LscensProbVec_N = 1;
-
-    case 'DG+REC24' % REC + BESS + DIESEL
-      PV    = REC.PV;           % Photovoltaic panel
-      WT    = REC.WT;           % Wind turbine
-      WEC   = REC.WEC;          % WEC turbine
-      BAT   = ESS.BAT;          % Battery
-      DG_obj= REC.DG.DG_obj;    % Diesel generator
-      Pload = Pload_obj.iniVec; % Load data
-   
-    case 'DG+REC365' % REC + BESS + DIESEL
-      PV    = REC.PV;           % Photovoltaic panel
-      WT    = REC.WT;           % Wind turbine
-      WEC   = REC.WEC;          % WEC turbine
-      BAT   = ESS.BAT;          % Battery
-      DG_obj= REC.DG.DG_obj;    % Diesel generator
+      HSS   = ESS.HSS;          % Hydrogen storage system
       Pload = Pload_obj.iniVec; % Load data
 
       % Reshape the data such that they are in the form of the REC
@@ -123,11 +110,16 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
   AF.gamma  = scenario.h_star/scenario.h;     % rescale the scenario to cost to daily values
   AF.YtD    = scenario.d_o;                   % rescale from yearly to daily cost
 
+   if ~isempty(BAT)
+    BAT.max_day_deg = 1/BAT.year_deg/W;
+  end
+
   % Identify how many REC are present
   if ~isempty(PV); num_PV = 1; else; num_PV = 0; end
   if ~isempty(WT); num_WT = 1; else; num_WT = 0; end
   if ~isempty(WEC); num_WEC = 1; else; num_WEC = 0; end
   if ~isempty(BAT); num_ESS = 1; else; num_ESS = 0; end
+  if ~isempty(HSS); num_HSS = 1; else; num_HSS = 0; end
   if ~isempty(DL); num_DL = 1; else; num_DL = 0; end
   n_REC = num_PV + num_WT + num_WEC; % Number of devices
 
@@ -137,9 +129,12 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
   %    \ V / (_| | |  | | (_| | |_) | |  __/\__ \
   %     \_/ \__,_|_|  |_|\__,_|_.__/|_|\___||___/
   
-  Pch   = 0; % charging power of the battery
-  Pdc   = 0; % discharging power of the battery
-  prob  = optimproblem; 
+  Pch = 0; % charging power of the battery
+  Pdc = 0; % discharging power of the battery
+  Pfc = 0; % fuel cell power
+  Pel = 0; % electrolizer power
+  psi = 0;
+  prob = optimproblem; 
   cvar_zeta = 0; % CVaR constraint
   cvar_s = zeros([W, 1]); % CVaR constraint
   P_REC_max = 0;
@@ -161,6 +156,7 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
       else
         variable_def_BESS;
       end
+      variable_def_HSS
       
     case {'WT+DG', 'REC-U', 'REC-U+DG', 'REC-C+DG24', 'REC-C+DG365'} % REC + BESS
       variable_def_REC;
@@ -170,7 +166,7 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
       else
         variable_def_BESS;
       end
-
+      variable_def_HSS
     case {'DG+REC24', 'DG+REC365'} % REC + BESS + DIESEL
       variable_def_REC;
       variable_def_DGv;
@@ -180,6 +176,7 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
       else
         variable_def_BESS;
       end
+      variable_def_HSS
       
     otherwise
       error('Case name not implemented yet\n');
@@ -197,12 +194,14 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
   %   \____\___/|___/\__|
   
   cTx_BESS  = 0;
+  cTx_HSS   = 0;
   cTx_GT    = 0;
   cTx_REC   = 0;
   cTx_DG    = 0;
   cTx_Pv    = 0;
   qTy_w_GT  = 0;
   qTy_w_BESS= 0;
+  qTy_w_HSS = 0;
   qTy_w_DG  = 0;
   qTy_w_DR  = 0;
   qTy_w_Pv  = 0;
@@ -210,41 +209,46 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
   Pres_vec = zeros(T, W); % vector power of the RECs
   switch case_constraint
     case {'GT24', 'GT365'} % Only GT
-      [cTx_GT, qTy_w_GT] = cost_GT(GT_obj, AF, REC.GT.n_NREC, P_GT, u_GT, z_GT, RR, x_GT, T, W, scenario.tau); % cost related to the GTs
+      [cTx_GT, qTy_w_GT] = cost_GT(GT_obj, AF, REC.GT.n_NREC, P_GT, u_GT, z_GT, RR, x_GT, T, W); % cost related to the GTs
       Pbt = zeros(T,W);
       
     case {'1GT+WT+DG', '2GT+WT+DG'} % 1/2 GT + WT + BESS
-      [cTx_GT, qTy_w_GT] = cost_GT(GT_obj, AF, REC.GT.n_NREC, P_GT, u_GT, z_GT, RR, x_GT, T, W, scenario.tau); % cost related to the GTs
+      [cTx_GT, qTy_w_GT] = cost_GT(GT_obj, AF, REC.GT.n_NREC, P_GT, u_GT, z_GT, RR, x_GT, T, W); % cost related to the GTs
       REC_obj = {WT};
       REC_obj = reshape_REC_power(REC_obj, Pload);
       [cTx_REC, P_REC_max, Pres_vec]  = cost_REC(REC_obj, AF, n_REC, x_REC);
-      [cTx_BESS, qTy_w_BESS]  = cost_BESS(BAT, AF, x_ESS_IV, x_ESS_NIV);
+      [cTx_BESS, qTy_w_BESS] = cost_BESS(BAT, AF, T, x_ESS_IV, x_ESS_NIV, xEssIv_theta);
+      [cTx_HSS, qTy_w_HSS] = cost_HSS(HSS, AF, x_HSS_IV, x_HSS_el, x_HSS_fc, W, HSS.rev_FC);
 
     case {'1GT+REC+DG', '2GT+REC+DG'} % 1/2 GT + REC + BESS
-      [cTx_GT, qTy_w_GT] = cost_GT(GT_obj, AF, REC.GT.n_NREC, P_GT, u_GT, z_GT, RR, x_GT, T, W, scenario.tau); % cost related to the GTs
+      [cTx_GT, qTy_w_GT] = cost_GT(GT_obj, AF, REC.GT.n_NREC, P_GT, u_GT, z_GT, RR, x_GT, T, W); % cost related to the GTs
       REC_obj = {PV, WT, WEC};
       REC_obj = reshape_REC_power(REC_obj, Pload);
       [cTx_REC, P_REC_max, Pres_vec]  = cost_REC(REC_obj, AF, n_REC, x_REC);
-      [cTx_BESS, qTy_w_BESS]  = cost_BESS(BAT, AF, x_ESS_IV, x_ESS_NIV);
+      [cTx_BESS, qTy_w_BESS] = cost_BESS(BAT, AF, T, x_ESS_IV, x_ESS_NIV, xEssIv_theta);
+      [cTx_HSS, qTy_w_HSS] = cost_HSS(HSS, AF, x_HSS_IV, x_HSS_el, x_HSS_fc, W, HSS.rev_FC);
     
     case 'WT+DG' % only WT + BESS
       REC_obj = {WT};
       REC_obj = reshape_REC_power(REC_obj, Pload);
       [cTx_REC, P_REC_max, Pres_vec]  = cost_REC(REC_obj, AF, n_REC, x_REC);
-      [cTx_BESS, qTy_w_BESS]  = cost_BESS(BAT, AF, x_ESS_IV, x_ESS_NIV);
+      [cTx_BESS, qTy_w_BESS] = cost_BESS(BAT, AF, T, x_ESS_IV, x_ESS_NIV, xEssIv_theta);
+      [cTx_HSS, qTy_w_HSS] = cost_HSS(HSS, AF, x_HSS_IV, x_HSS_el, x_HSS_fc, W, HSS.rev_FC);
       
     case {'REC-U', 'REC-U+DG', 'REC-C+DG24', 'REC-C+DG365'} % REC + BESS
       REC_obj = {PV, WT, WEC};
       REC_obj = reshape_REC_power(REC_obj, Pload);
       [cTx_REC, P_REC_max, Pres_vec]  = cost_REC(REC_obj, AF, n_REC, x_REC);
-      [cTx_BESS, qTy_w_BESS]          = cost_BESS(BAT, AF, x_ESS_IV, x_ESS_NIV);
+      [cTx_BESS, qTy_w_BESS] = cost_BESS(BAT, AF, T, x_ESS_IV, x_ESS_NIV, xEssIv_theta);
+      [cTx_HSS, qTy_w_HSS] = cost_HSS(HSS, AF, x_HSS_IV, x_HSS_el, x_HSS_fc, W, HSS.rev_FC);
               
     case {'DG+REC24', 'DG+REC365'} % REC + BESS + DIESEL
       REC_obj = {PV, WT, WEC};
       REC_obj = reshape_REC_power(REC_obj, Pload);
       [cTx_REC, P_REC_max, Pres_vec]  = cost_REC(REC_obj, AF, n_REC, x_REC);
-      % [cTx_DG, qTy_w_DG]      = cost_DG_linear(DG_obj, AF, REC.DG.n_NREC, P_DG, x_DG, T, W);
-      [cTx_BESS, qTy_w_BESS]  = cost_BESS(BAT, AF, x_ESS_IV, x_ESS_NIV);
+      [cTx_DG, qTy_w_DG]  = cost_DG_linear(DGv_obj, AF, REC.DG.n_NREC, P_DG, x_DG, T, W);
+      [cTx_BESS, qTy_w_BESS] = cost_BESS(BAT, AF, T, x_ESS_IV, x_ESS_NIV, xEssIv_theta);
+      [cTx_HSS, qTy_w_HSS] = cost_HSS(HSS, AF, x_HSS_IV, x_HSS_el, x_HSS_fc, W, HSS.rev_FC);
 
     otherwise
       error('Case name not implemented yet');
@@ -256,8 +260,8 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
   [qTy_w_Pns_Pct]     = cost_Pns_Pct(Pns, Pct, T, Pload_obj);
   [cTx_Pv, qTy_w_Pv]  = cost_DGv(AF, P_DGv, T, P_DGv_max_inst,  REC.DGv.DGv_obj{1}); % virtual power (i.e. diesel cost without intercept)
 
-  cTx = cTx_GT + cTx_BESS + cTx_REC + cTx_DG + cTx_Pv;               % Total 1st stage cost
-  qTy_w = qTy_w_GT + qTy_w_BESS + qTy_w_Pns_Pct + qTy_w_DG + qTy_w_DR + qTy_w_Pv; % Total 2nd stage cost
+  cTx = cTx_GT + cTx_BESS + cTx_REC + cTx_DG + cTx_Pv + cTx_HSS;               % Total 1st stage cost
+  qTy_w = qTy_w_GT + qTy_w_BESS + qTy_w_Pns_Pct + qTy_w_DG + qTy_w_DR + qTy_w_Pv + qTy_w_HSS; % Total 2nd stage cost
 
   f     = cTx + AF.gamma*qTy_w*LscensProbVec_N;
   if num_ESS > 0
@@ -291,7 +295,10 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
       prob = REC_constraints(prob, P_res, P_REC_max, n_REC, REC_obj, x_REC);
       
       % BESS
-      prob = BESS_constraints(prob, scenario, BESS_NL_model, E0, Ebt, Pch, Pdc, Pbt, Uch, Udc, PchUch, PdcUdc, BAT, x_ESS_IV, x_ESS_NIV, epsilon_bat);
+      [prob, psi] = BESS_constraints(prob, BESS_NL_model, E0, Ebt, Pch, Pdc, Pbt, Uch, Udc, PchUch, PdcUdc, BAT, x_ESS_IV, x_ESS_NIV, epsilon_bat, theta, theta_sh, h_pla, alpha_pla, zeta_pla, zeta_psi, u_pla, y_abs, z_abs, z_max, BAT.x_deg, BAT.y_deg, z_xEssIv_theta, xEssIv_theta, x_ESS_IV_min, x_ESS_IV_max, x_ESS_presence, b_expansion, max_theta);
+
+      % HSS
+      prob = HSS_constraints(prob, E_H0, E_H, Pel, Pfc, PelUel, PfcUfc, Uel, Ufc, HSS, x_HSS_IV, x_HSS_fc, x_HSS_el, HSS.rev_FC);
 
     case {'WT+DG', 'REC-C+DG24', 'REC-C+DG365'}  % G -> WT + BESS
                             % I -> REC + BESS
@@ -300,7 +307,10 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
       prob = REC_constraints(prob, P_res, P_REC_max, n_REC, REC_obj, x_REC);
 
       % BESS
-      prob = BESS_constraints(prob, scenario, BESS_NL_model, E0, Ebt, Pch, Pdc, Pbt, Uch, Udc, PchUch, PdcUdc, BAT, x_ESS_IV, x_ESS_NIV, epsilon_bat);
+      [prob, psi] = BESS_constraints(prob, BESS_NL_model, E0, Ebt, Pch, Pdc, Pbt, Uch, Udc, PchUch, PdcUdc, BAT, x_ESS_IV, x_ESS_NIV, epsilon_bat, theta, theta_sh, h_pla, alpha_pla, zeta_pla, zeta_psi, u_pla, y_abs, z_abs, z_max, BAT.x_deg, BAT.y_deg, z_xEssIv_theta, xEssIv_theta, x_ESS_IV_min, x_ESS_IV_max, x_ESS_presence, b_expansion, max_theta);
+
+      % HSS
+      prob = HSS_constraints(prob, E_H0, E_H, Pel, Pfc, PelUel, PfcUfc, Uel, Ufc, HSS, x_HSS_IV, x_HSS_fc, x_HSS_el, HSS.rev_FC);
 
     case {'REC-U+DG'} % REC + BESS w/o plant size constraints and possibility to use Pv
       % REC
@@ -308,7 +318,10 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
       prob = max_power(prob, 'REC_max_power', P_res, P_REC_max); % Maximum power produced by the REC
       
       % BESS
-      prob = BESS_constraints(prob, scenario, BESS_NL_model, E0, Ebt, Pch, Pdc, Pbt, Uch, Udc, PchUch, PdcUdc, BAT, x_ESS_IV, x_ESS_NIV, epsilon_bat);
+      [prob, psi] = BESS_constraints(prob, BESS_NL_model, E0, Ebt, Pch, Pdc, Pbt, Uch, Udc, PchUch, PdcUdc, BAT, x_ESS_IV, x_ESS_NIV, epsilon_bat, theta, theta_sh, h_pla, alpha_pla, zeta_pla, zeta_psi, u_pla, y_abs, z_abs, z_max, BAT.x_deg, BAT.y_deg, z_xEssIv_theta, xEssIv_theta, x_ESS_IV_min, x_ESS_IV_max, x_ESS_presence, b_expansion, max_theta);
+
+      % HSS
+      prob = HSS_constraints(prob, E_H0, E_H, Pel, Pfc, PelUel, PfcUfc, Uel, Ufc, HSS, x_HSS_IV, x_HSS_fc, x_HSS_el, HSS.rev_FC);
     
       case {'REC-U'} % REC + BESS w/o plant size constraints
       % REC
@@ -316,7 +329,10 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
       prob = max_power(prob, 'REC_max_power', P_res, P_REC_max); % Maximum power produced by the REC
       
       % BESS
-      prob = BESS_constraints(prob, scenario, BESS_NL_model, E0, Ebt, Pch, Pdc, Pbt, Uch, Udc, PchUch, PdcUdc, BAT, x_ESS_IV, x_ESS_NIV, epsilon_bat);
+     [prob, psi] = BESS_constraints(prob, BESS_NL_model, E0, Ebt, Pch, Pdc, Pbt, Uch, Udc, PchUch, PdcUdc, BAT, x_ESS_IV, x_ESS_NIV, epsilon_bat, theta, theta_sh, h_pla, alpha_pla, zeta_pla, zeta_psi, u_pla, y_abs, z_abs, z_max, BAT.x_deg, BAT.y_deg, z_xEssIv_theta, xEssIv_theta, x_ESS_IV_min, x_ESS_IV_max, x_ESS_presence, b_expansion, max_theta);
+
+      % HSS
+      prob = HSS_constraints(prob, E_H0, E_H, Pel, Pfc, PelUel, PfcUfc, Uel, Ufc, HSS, x_HSS_IV, x_HSS_fc, x_HSS_el, HSS.rev_FC);
 
       % Virtual power
       prob.Constraints.Pv_zero = P_DGv == 0;
@@ -328,14 +344,17 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
       % DG
       for g = 1:REC.DG.n_NREC
         name = ['DG', num2str(g), '_max_power'];
-        prob = max_power(prob, name, P_DG(:, :, g), x_DG(g)*DG_obj{g}.PowRated); % max power for each DG
+        prob = max_power(prob, name, P_DG(:, :, g), x_DG(g)*DGv_obj{g}.PowRated); % max power for each DG
       end
   
       % REC
       prob = REC_constraints(prob, P_res, P_REC_max, n_REC, REC_obj, x_REC);
   
       % BESS
-      prob = BESS_constraints(prob, scenario, BESS_NL_model, E0, Ebt, Pch, Pdc, Pbt, Uch, Udc, PchUch, PdcUdc, BAT, x_ESS_IV, x_ESS_NIV, epsilon_bat);
+      [prob, psi] = BESS_constraints(prob, BESS_NL_model, E0, Ebt, Pch, Pdc, Pbt, Uch, Udc, PchUch, PdcUdc, BAT, x_ESS_IV, x_ESS_NIV, epsilon_bat, theta, theta_sh, h_pla, alpha_pla, zeta_pla, zeta_psi, u_pla, y_abs, z_abs, z_max, BAT.x_deg, BAT.y_deg, z_xEssIv_theta, xEssIv_theta, x_ESS_IV_min, x_ESS_IV_max, x_ESS_presence, b_expansion, max_theta);
+
+      % HSS
+      prob = HSS_constraints(prob, E_H0, E_H, Pel, Pfc, PelUel, PfcUfc, Uel, Ufc, HSS, x_HSS_IV, x_HSS_fc, x_HSS_el, HSS.rev_FC);
 
     otherwise
       error('Case name not implemented yet\n');
@@ -344,7 +363,10 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
 
   % Power balance
   if BESS_NL_model == 1
-    prob = power_balance_NL_model(prob, P_gen_tot, Pch, Pdc, Pns, Pct, P_DGv, Pload_PS);
+    P_storage_ch = Pch + Pel; % total power charging the storages
+    P_storage_dc = Pdc + Pfc; % total power discharging the storages
+
+    prob = power_balance_NL_model(prob, P_gen_tot, P_storage_ch, P_storage_dc, Pns, Pct, P_DGv, Pload_PS);
   else
     prob = power_balance(prob, P_gen_tot, Pbt, Pns, Pct, P_DGv, Pload_PS);
   end
@@ -364,7 +386,7 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
   prob = CVaR_constraint(prob, cvar_zeta, cvar_s, cTx, qTy_w, AF.gamma, wTz);
 
   % Virtual power
-  prob = Pv_power_constraint_linear(prob, P_DGv, P_DGv_max_inst);
+  prob = Pv_power_constraint_linear(prob, P_DGv, P_DGv_max_inst, T, W, DGv_obj, u_Pv);
   % prob = Pv_power_constraint(prob, Pv, Pv_max_inst, u_Pv, zeta_Pv, P_DGv_max);
 
   %   ____        _       _   _             
@@ -375,7 +397,7 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
   
   fprintf('Start solution\n')
 
-  opt = optimoptions('intlinprog', 'Display', 'iter', 'AbsoluteGapTolerance', abs_gap_tol, 'RelativeGapTolerance', rel_gap_tol, 'MaxTime', 2*3600, 'Heuristics', 'advanced', 'ObjectiveImprovementThreshold',0);
+  opt = optimoptions('intlinprog', 'Display', 'iter', 'RelativeGapTolerance', rel_gap_tol, 'MaxTime', max_time);
   prob.ObjectiveSense = 'minimize';
   [values_solution, values_minvalue, tmp, min_info] = solve(prob, 'Options', opt);
 
@@ -399,8 +421,14 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
 
   % Reshape values in a vector
   values.n_REC = n_REC;
-  [values_vector, values_solution] = reshape_data(values_solution, Pload, Pres_vec, BAT);
+  [values_vector, values_solution] = reshape_data(values_solution, Pload, Pres_vec, BAT, HSS);
   values_vector.P_res_vec = Pres_vec;
+
+  if isreal(psi)
+    values_solution.psi = psi;
+  else
+    values_solution.psi = evaluate(psi, values_solution);
+  end
 
   % % Compute the capacity factors
   % values_vector = capacity_factor(values_vector, values_vector, PV, WT, WEC, BAT, W, T);
@@ -411,8 +439,8 @@ function [values_solution, values_vector, values_minvalue, CO2_emitted] = CASE_o
   % compute the installed power
   compute_installed_power;
       
-  % Evaluate the costs 
-  compute_final_costs;  
+  % Evaluate the costs  
+  [values_solution, values_minvalue] = compute_final_costs(values_solution, values_minvalue, AF, LscensProbVec_N, cvar_alpha, cvar_beta, case_constraint, cTx, cTx_DG, cTx_BESS, cTx_HSS, cTx_REC, cTx_GT, cTx_Pv, qTy_w, qTy_w_GT, qTy_w_BESS, qTy_w_Pns_Pct, qTy_w_DG, qTy_w_DR, qTy_w_Pv, wTz);
 
   % evaluate the LCOE
   compute_LCOE_polysystem;

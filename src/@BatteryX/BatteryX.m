@@ -49,23 +49,34 @@ classdef BatteryX < handle
     Pdc_max                  % [W] maximum discharging power
     E_max                    % [Wh] maximum energy stored
     constraint_weight = 1e10;  % weight for the soft 
+    deg_coeff_A              % coefficient A of the BESS degradation model
+    deg_coeff_B              % coefficient B of the BESS degradation model
+    num_points_deg_approx    % number of points to be used for the PLA of the damage function
+    x_deg                    % abscissa for the damage function (battery energy in [MWh])
+    y_deg                    % ordinate for the damage function (damage)
+    eol_fraction             % fraction of the initial value that the asset has at its end of live
+    L_sh                     % shelf lifetime of the battery
+    deg_cost_enable          % 1 if the degradation cost is considered, 0 otherwise 
+    year_deg                 % years that the battery has to last
+    max_day_deg              % maximum allowed daily degradation
   end % properties
  
 
   methods
-      % standard constructor
-      function objData = WindTurbineX(inputData)
-          % Summary of constructor
-          if nargin == 0
-              %
-              objData.iniVec = [];
-          else
-%                 objData.iniVec = inputData./max(inputData,[],'all');
-              objData.iniVec = inputData;
+    function objData = BuildDegradationPoints(objData)
+      % BuildDegradationPoints generates the points that will be then used in the piecewise linear approximation for the degradation model of the battery
 
-          end
-      end % standard constructor
-      %
+      C_batt = objData.C_batt; % capacity of one battery model
+      A = objData.deg_coeff_A; % coefficient of the damage function
+      B = objData.deg_coeff_B; % coefficient of the damage function
+      num_points_deg_approx = objData.num_points_deg_approx; % number of points to be used for the PLA of the damage function
+
+      x_deg = linspace(0,1,num_points_deg_approx)'; % ordinate points of the interpolation (state of charge)
+      y_deg = A*(1 - x_deg).^B;
+    
+      objData.x_deg = x_deg;
+      objData.y_deg = y_deg;
+    end
   end % normal methods
 
 %   ____  _        _   _                       _   _               _     

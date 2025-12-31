@@ -14,7 +14,11 @@ switch sweep_type
   case 'DGpower'
     sweep_name = {'$\eta_{DG}$'};
   case 'PVCost'
-  sweep_name = {'$\eta_{PV}$'};
+    sweep_name = {'$\eta_{PV}$'};
+  case 'WECCost'
+    sweep_name = {'$\eta_{PV}$'};
+  otherwise
+    error('Case not defined yet!')
 end
 
 if plot_param.print_figure == 1

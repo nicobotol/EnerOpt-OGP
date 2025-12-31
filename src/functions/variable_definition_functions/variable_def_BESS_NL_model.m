@@ -1,5 +1,8 @@
 % Define the variables related to the battery energy storage system (BESS) model
 
+% Shelf degradation
+theta_sh = BAT.deg_cost_enable*scenario.tau/BAT.L_sh;
+
 % Maximum BESS physical power and energy
 if strcmp(case_constraint, 'REC-U') 
   % case of unconstrained REC and BESS
@@ -11,9 +14,12 @@ else
   max_phy_Ebt = BAT.E_max;
 end
 
+x_ESS_IV_max = max_phy_Ebt/BAT.C_batt; % maximum value of the variable x_ESS_IV
+x_ESS_IV_min = 0; % minimum value of the variable x_ESS_IV
 
 % x_ESS = [N_ESS]
-x_ESS_IV  = optimvar('x_ESS_IV', [num_ESS,1], 'lowerBound', zeros(num_ESS, 1), 'UpperBound', max_phy_Ebt/BAT.C_batt, 'Type', 'integer');
+x_ESS_IV  = optimvar('x_ESS_IV', [num_ESS,1], 'lowerBound', x_ESS_IV_min, 'UpperBound', x_ESS_IV_max, 'Type', 'integer');
+x_ESS_presence  = optimvar('x_ESS_presence', [num_ESS,1], 'lowerBound', 0, 'UpperBound', 1, 'Type', 'integer'); % variable indicating the presence of the BESS
       
 % x_ESS_NIV = [Pbt_max]
 x_ESS_NIV = optimvar('x_ESS_NIV', [num_ESS,1], 'lowerBound', [0], 'UpperBound', max_phy_Pbt, 'Type', 'continuous');
@@ -38,6 +44,29 @@ PdcUdc    = optimvar('PdcUdc', [T, W], 'lowerBound', [0], 'UpperBound', max_phy_
 
 % battery SOC soft constraint 
 epsilon_bat = optimvar('epsilon_bat', 1, 'LowerBound', [0], 'UpperBound', max_phy_Ebt, 'Type', 'continuous'); 
+
+% max degradation cost
+max_theta   = max(max(BAT.y_deg)/2, theta_sh); % max value that theta can get
+
+Ki          = max(1, ceil(log2(x_ESS_IV_max - x_ESS_IV_min))); % number of points for the binary expansion of the product between damage and battery module number
+b_expansion = 2.^(0:Ki-1)'; % binary expansion coefficients
+% b_expansion_tensor  = repmat(reshape(b_expansion', 1, 1, []), T, W, 1);
+% zeta_theta  = optimvar('zeta_theta', [T-1,W,Ki], 'Type', 'continuous', 'LowerBound', 0,  'UpperBound', max_theta); % helper variable for linearize the product theta*x_ESS_IV
+% u_theta     = optimvar('u_theta', [T-1,W,Ki], 'Type', 'integer', 'LowerBound', 0, 'UpperBound', 1); % helper variable for linearize the product theta*x_ESS_IV
+zeta_pla    = optimvar('zeta_pla', [T,W,BAT.num_points_deg_approx,Ki], 'Type', 'continuous', 'LowerBound', 0,  'UpperBound', 1); % helper variable for linearize the product alpha_pla*x_ESS_IV
+zeta_psi    = optimvar('zeta_psi', [T,W,BAT.num_points_deg_approx], 'Type', 'continuous', 'LowerBound', 0,  'UpperBound', 1); % helper variable for linearize the product alpha_pla*x_ESS_presence
+u_pla       = optimvar('u_pla', [Ki], 'Type', 'integer', 'LowerBound', 0,  'UpperBound', 1); % helper variable for linearize the product alpha_pla*x_ESS_IV
+alpha_pla   = optimvar('alpha_pla', [T,W,BAT.num_points_deg_approx], 'Type', 'continuous', 'LowerBound', 0, 'UpperBound', 1); % continuous helper variable for the PLA
+h_pla       = optimvar('h_pla', [T,W,BAT.num_points_deg_approx+1], 'Type', 'integer', 'LowerBound', 0, 'UpperBound', 1); % integer helper variable for the PLA
+
+z_max = optimvar('z_max', [T-1, W, 2], 'lowerBound', 0, 'UpperBound', 1, 'Type', 'integer'); % helper variable for obtaining theta = max(theta_cy, theta_sh)
+z_abs = optimvar('z_abs', [T-1, W], 'lowerBound', 0, 'UpperBound', 1, 'Type', 'integer'); % helper integer variable for obtaining theta_cy(t) = abs(psi(t) - psi(t-1))
+y_abs = optimvar('y_abs', [T-1, W], 'lowerBound', 0, 'UpperBound', 2*max_theta, 'Type', 'continuous'); % helper integer variable defined as y_abs(t) = abs(psi(t) - psi(t-1))
+
+% battery degradation cost
+theta       = optimvar('theta', [T-1,W], 'Type', 'continuous', 'LowerBound', 0, 'UpperBound', max_theta); % damage
+xEssIv_theta= optimvar('xEssIv_theta', [T-1,W], 'Type', 'continuous', 'LowerBound', 0, 'UpperBound', max_theta*x_ESS_IV_max); % damage times number of installed BESS module
+z_xEssIv_theta=optimvar('z_xEssIv_theta', [T-1,W,Ki], 'Type', 'continuous', 'LowerBound', 0, 'UpperBound', x_ESS_IV_max); % helper for linearize the product between theta*x_ESS_IV
 
 % Virtual power
 delta_ESS_Pmax = optimvar('delta_ESS_Pmax', [T, W, num_ESS], 'Type', 'integer', 'LowerBound', 0, 'UpperBound', 1); % 1 if the max power is installed

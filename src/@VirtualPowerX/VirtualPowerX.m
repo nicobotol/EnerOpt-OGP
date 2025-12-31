@@ -23,6 +23,7 @@ classdef VirtualPowerX < handle
         alpha_g;          % coeff for estimating modeling fuel consumption
         beta_g;           % coeff for estimating modeling fuel consumption
         C_OeM;            % estimated cost of operation and maintenance [$/kWh]
+        Toff;
 
     end % properties
    

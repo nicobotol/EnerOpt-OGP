@@ -8,6 +8,7 @@ classdef ESSX < handle
 %                  |_|                              
   properties
     BAT = []; % Battery
+    HSS = []; % Hydrogen storage
   end % properties
  
 
